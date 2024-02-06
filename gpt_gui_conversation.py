@@ -54,6 +54,9 @@ def handle_user_input():
     x = (screen_width - popup_width) // 2
     y = (screen_height - popup_height) // 2
     thinking_popup.geometry(f"+{x}+{y}")
+    
+    thinking_popup.update()
+
 
     # 대화 기록을 챗봇에 전송하고 응답을 받음
     response = send_message(message_log)
