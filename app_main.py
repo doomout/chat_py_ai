@@ -1,113 +1,24 @@
-import openai
 import os
 import tkinter as tk
 from tkinter import scrolledtext, messagebox, filedialog
 import pandas as pd
-
 # UTF-8 인코딩 설정
 import sys
 sys.stdout.reconfigure(encoding='utf-8')
 
-# OpenAI API 키 설정
-openai.api_key = os.getenv("OPENAI_API_KEY", default="")
+# openai==1.1.1 설정
+from openai import OpenAI 
+client = OpenAI(
+    api_key=os.environ.get("OPENAI_API_KEY"),
+)
 
-
-# 대화 기록 초기화
-message_log = [{"role": "system", "content": '''
-                -You are a DJ assistant who creates playlists. Users are Korean, so they have to communicate in Korean, but artist names and song titles should not be translated into Korean.
-                -When showing a playlist, the title, artistry sheet, and release year of each song must be displayed in a list format. You should ask the user, 'Do you want to save this playlist as CSV?'
-                -To save, you must display the playlist with a header in CSV format separated by a semicolon (;) and a release year in 'YYYY' format.
-                -CSV format must start on a new line, and the header of the CSV file must be in English.
-                -Must be composed in the format ‘Title;Aritst;Release Date’
-                '''
-                }]
-
-# OpenAI 챗봇 모델과 상호작용하는 함수
-def send_message(message_log):
-    response = openai.ChatCompletion.create(
-        model="gpt-3.5-turbo",
-        max_tokens=1000,
-        messages=message_log,
-        temperature=0.1
-    )
-
-    # 생성된 텍스트 중 첫 번째 텍스트 반환
-    for choice in response.choices:
-        if "text" in choice:
-            return choice.text
-    return response.choices[0].message['content']
-
-def show_popup(window, popup_message):    
-    #팝업창 내용
-    thinking_popup = tk.Toplevel(root)
-    thinking_popup.title("GPT-3.5")
-
-    # '생각 중...' 메시지를 표시하는 레이블
-    thinking_label = tk.Label(thinking_popup, text=popup_message, font=("맑은 고딕", 12))
-    thinking_label.pack(padx=20, pady=10)
-
-    # 팝업 창을 화면 중앙에 표시
-    thinking_popup.update_idletasks()
-    popup_width = thinking_popup.winfo_width()
-    popup_height = thinking_popup.winfo_height()
-    screen_width = thinking_popup.winfo_screenwidth()
-    screen_height = thinking_popup.winfo_screenheight()
-    x = (screen_width - popup_width) // 2
-    y = (screen_height - popup_height) // 2
-    thinking_popup.geometry(f"+{x}+{y}")
-
-    thinking_popup.transient(window)
-
-    # '생각 중...' 팝업 창 닫기
-    thinking_popup.attributes('-topmost', True)
-
-    return thinking_popup
-
-# 사용자 입력을 처리하는 함수
-def handle_user_input():
-    user_input = user_input_entry.get()
-    user_input_entry.delete(0, tk.END)
-    
-    # 사용자가 'quit'을 입력하면 GUI 종료
-    if user_input.lower() == "quit":
-        root.destroy()
-        return
-    
-    #생각중... 팝업 시작
-    popup_window = show_popup(root, "생각 중...")
-    
-    # 사용자 입력을 대화 기록에 추가
-    message_log.append({"role": "user", "content": user_input})
-
-    # 대화 기록을 챗봇에 전송하고 응답을 받음
-    response = send_message(message_log)
-    
-    #생각중.. 팝업 끝
-    popup_window.destroy()
-
-    # 챗봇 응답을 대화 기록에 추가하고 GUI에 표시
-    message_log.append({"role": "assistant", "content": response})
-    chat_history_text.config(state=tk.NORMAL)
-   
-
-    # 사용자와 챗봇 메시지를 다르게 색상 지정
-    chat_history_text.tag_configure("user_tag", background="lightblue")
-    chat_history_text.tag_configure("assistant_tag", background="lightgreen")
-
-    # 사용자 입력과 챗봇 응답에 태그 적용
-    chat_history_text.insert(tk.END, f"You: {user_input}\n", "user_tag")
-    chat_history_text.insert(tk.END, f"Assistant: {response}\n", "assistant_tag")
-    
-    chat_history_text.config(state=tk.DISABLED)
-
-    # CSV 형식을 추출하여 pandas DataFrame으로 변환
-    playlist_df = extract_csv_to_dataframe(response)
-    
-    # DataFrame을 메시지 상자에 표시
-    messagebox.showinfo("플레이리스트 CSV", f"플레이리스트 CSV:\n{playlist_df}")
-    
-    # 사용자에게 플레이리스트를 CSV로 저장할지 물음
-    save_playlist_as_csv(playlist_df)
+# 플레이리스트를 CSV로 저장하는 함수
+def save_playlist_as_csv(playlist_df):
+    file_path=filedialog.asksaveasfilename(defaultextension='.csv', filetypes=[("CSV files", "*.csv")])
+    if file_path:
+        playlist_df.to_csv(file_path, sep=';', index=False, lineterminator='\n')
+        return f'파일을 저장했습니다. 저장 경로는 다음과 같습니다. \n {file_path}\n'
+    return '저장을 취소했습니다'
 
 # CSV 형식을 추출하여 pandas 데이터 프레임으로 변환하는 함수
 def extract_csv_to_dataframe(response):
@@ -115,7 +26,6 @@ def extract_csv_to_dataframe(response):
     if ";" in response:
         response_lines = response.strip().split("\n")
         csv_data=[]
-
         for line in response_lines:
             if ";" in line:
                 csv_data.append(line.split(";"))
@@ -127,41 +37,145 @@ def extract_csv_to_dataframe(response):
             return None
     else:
         return None
-       
-# 플레이리스트를 CSV로 저장하는 함수
-def save_playlist_as_csv(playlist_df):
-    if playlist_df is None:
-        messagebox.showerror("오류", "플레이리스트 데이터 추출에 실패했습니다.")
-        return
-    # 사용자에게 플레이리스트를 CSV로 저장할지 물음
-    response = messagebox.askyesno("플레이리스트를 CSV로 저장", "이 플레이리스트를 CSV로 저장하시겠습니까?")
-    if response:
-        # CSV 파일 저장 경로 선택
-        file_path = filedialog.asksaveasfilename(defaultextension=".csv", filetypes=[("CSV files", "*.csv")])
-        if file_path:
-            # DataFrame을 CSV로 저장
-            playlist_df.to_csv(file_path, index=False, sep=";")
-            messagebox.showinfo("성공", f"플레이리스트가 성공적으로 CSV로 저장되었습니다.\n저장 경로는 다음과 같습니다.\n{file_path}")
-    else:
-        messagebox.showinfo("취소", "저장을 취소했습니다.")
+     
+# OpenAI 챗봇 모델과 상호 작용하는 함수
+def send_message(message_log):
+    response = client.chat.completions.create(
+        model="gpt-3.5-turbo",
+        max_tokens=1000,
+        messages=message_log,
+        temperature=0.1
+    )
+
+    # 생성된 텍스트 중 첫 번째 텍스트 반환
+    for choice in response.choices:
+        if "text" in choice:
+            return choice.text
+    return response.choices[0].message.content
+
+
+def main():
+    # 대화 기록 초기화
+    message_log = [{"role": "system", 
+                    "content": '''
+                You are a DJ assistant who creates playlists. 
+                Your user will be Korean, so communicate in Korean, but you must not translate artists' names and song titles into Korean.
+                - When you show a playlist, it must contains the title, artist, and release year of each song in a list format. 
+                You must ask the user if they want to save the playlist like this: "이 플레이리스트를 CSV로 저장하시겠습니까?"
+                - If they want to save the playlist into CSV, show the playlist with a header in CSV format, separated by ';' and the release year format should be 'YYYY'. 
+                The CSV format must start with a new line. 
+                The header of the CSV file must be in English and it should be formatted as follows: 'Title;Artist;Released'.
+                    '''
+                    }]
+
+    def show_popup(window, popup_message):    
+        #팝업창 내용
+        thinking_popup = tk.Toplevel(window)
+        thinking_popup.title("")
+
+        # '생각 중...' 메시지를 표시하는 레이블
+        thinking_label = tk.Label(thinking_popup, text=popup_message, font=("맑은 고딕", 12))
+        thinking_label.pack(expand=True, fill=tk.BOTH)
+
+         # 팝업 창의 크기 조절하기
+        window.update_idletasks()
+        popup_width=thinking_label.winfo_reqwidth() + 20
+        popup_height=thinking_label.winfo_reqheight() + 20
+        thinking_popup.geometry(f"{popup_width}x{popup_height}")
+
+        # 팝업 창을 화면 중앙에 표시
+        window_x=window.winfo_x()
+        window_y=window.winfo_y()
+        window_width=window.winfo_width()
+        window_height=window.winfo_height()
+
+        popup_x=window_x + window_width // 2 - popup_width // 2
+        popup_y=window_y + window_height // 2 - popup_height // 2
+        thinking_popup.geometry(f"+{popup_x}+{popup_y}")
+
+        thinking_popup.transient(window)
+        thinking_popup.attributes('-topmost', True)
+
+        thinking_popup.update()
+        return thinking_popup
+
+    # 사용자 입력을 처리하는 함수
+    def on_send():
+        user_input = user_entry.get()
+        user_entry.delete(0, tk.END)
         
+        # 사용자가 'quit'을 입력하면 GUI 종료
+        if user_input.lower() == "quit":
+            window.destroy()
+            return
+        
+        # 사용자 입력을 대화 기록에 추가
+        message_log.append({"role": "user", "content": user_input})
+        chat_history_text.config(state=tk.NORMAL)
+        chat_history_text.insert(tk.END, f"You: {user_input}\n", "user_tag")
 
-# 메인 GUI 창 생성
-root = tk.Tk()
-root.title("GPT DJ")
+        #생각중... 팝업 시작
+        popup_window = show_popup(window, "생각 중...")
+        
+        # '생각 중...' 팝업 창이 반드시 화면에 나타나도록 강제로 설정하기
+        window.update_idletasks() 
 
-# 대화 기록을 표시할 스크롤 가능한 텍스트 창 생성
-chat_history_text = scrolledtext.ScrolledText(root, wrap=tk.WORD, state=tk.DISABLED)
-chat_history_text.pack(expand=True, fill=tk.BOTH)
+        # 대화 기록을 챗봇에 전송하고 응답을 받음
+        response = send_message(message_log)
+        
+        #생각중.. 팝업 끝
+        popup_window.destroy()
 
-# 사용자 입력 창 생성
-user_input_entry = tk.Entry(root, width=50, font=("Clear Gothic", 12))
-user_input_entry.pack(pady=10)
+        # CSV 형식을 추출하여 pandas DataFrame으로 변환
+        playlist_df = extract_csv_to_dataframe(response)
 
-# 사용자 입력을 처리하는 "Send" 버튼 생성
-send_button = tk.Button(root, text="Send", command=handle_user_input, font=("Clear Gothic", 12))
-send_button.pack(side=tk.RIGHT)
+        if playlist_df is not None:
+            file_save_result = save_playlist_as_csv(playlist_df)
+            print(file_save_result)
+            if file_save_result == '저장을 취소했습니다':
+                response = file_save_result
+            else:
+                response = file_save_result + '\n' + response
 
 
-# GUI 이벤트 루프 시작
-root.mainloop()
+        # 챗봇 응답을 대화 기록에 추가하고 GUI에 표시
+        message_log.append({"role": "assistant", "content": response})
+
+        # 사용자 입력과 챗봇 응답에 태그 적용
+        chat_history_text.insert(tk.END, f"assistant: {response}\n", "assistant_tag")
+        chat_history_text.config(state=tk.DISABLED)
+        
+        # chat_history_text를 수정하지 못하게 설정
+        chat_history_text.see(tk.END)
+
+
+    # 메인 GUI 창 생성
+    window = tk.Tk()
+    window.title("GPT DJ")
+
+    font=('맑은 고딕', 10)
+
+    # 대화 기록을 표시할 스크롤 가능한 텍스트 창 생성
+    chat_history_text = scrolledtext.ScrolledText(window, wrap=tk.WORD, bg='#f0f0f0', font=font)
+    chat_history_text.tag_configure("user_tag", background="#c9daf8")
+    chat_history_text.tag_configure("assistant_tag", background="#e4e4e4")
+    chat_history_text.pack(fill=tk.BOTH, expand=True, padx=10, pady=10)
+
+    # user_entry와 send_button을 담는 frame
+    input_frame=tk.Frame(window)
+    # 창의 크기에 맞추어 조절하기(5)
+    input_frame.pack(fill=tk.X, padx=10, pady=10)
+
+    user_entry=tk.Entry(input_frame, font=font)
+    user_entry.pack(fill=tk.X, side=tk.LEFT, expand=True)
+
+    # 사용자 입력을 처리하는 "Send" 버튼 생성
+    send_button = tk.Button(input_frame, text="Send", command=on_send)
+    send_button.pack(side=tk.RIGHT)
+
+    window.bind('<Return>', lambda event: on_send())
+    # GUI 이벤트 루프 시작
+    window.mainloop()
+
+if __name__ == "__main__":
+    main()
