@@ -11,6 +11,17 @@ sys.stdout.reconfigure(encoding='utf-8')
 # OpenAI API 키 설정
 openai.api_key = os.getenv("OPENAI_API_KEY", default="")
 
+
+# 대화 기록 초기화
+message_log = [{"role": "system", "content": '''
+                -You are a DJ assistant who creates playlists. Users are Korean, so they have to communicate in Korean, but artist names and song titles should not be translated into Korean.
+                -When showing a playlist, the title, artistry sheet, and release year of each song must be displayed in a list format. You should ask the user, 'Do you want to save this playlist as CSV?'
+                -To save, you must display the playlist with a header in CSV format separated by a semicolon (;) and a release year in 'YYYY' format.
+                -CSV format must start on a new line, and the header of the CSV file must be in English.
+                -Must be composed in the format ‘Title;Aritst;Release Date’
+                '''
+                }]
+
 # OpenAI 챗봇 모델과 상호작용하는 함수
 def send_message(message_log):
     response = openai.ChatCompletion.create(
@@ -26,48 +37,58 @@ def send_message(message_log):
             return choice.text
     return response.choices[0].message['content']
 
+def show_popup(window, popup_message):    
+    #팝업창 내용
+    thinking_popup = tk.Toplevel(root)
+    thinking_popup.title("GPT-3.5")
+
+    # '생각 중...' 메시지를 표시하는 레이블
+    thinking_label = tk.Label(thinking_popup, text=popup_message, font=("맑은 고딕", 12))
+    thinking_label.pack(padx=20, pady=10)
+
+    # 팝업 창을 화면 중앙에 표시
+    thinking_popup.update_idletasks()
+    popup_width = thinking_popup.winfo_width()
+    popup_height = thinking_popup.winfo_height()
+    screen_width = thinking_popup.winfo_screenwidth()
+    screen_height = thinking_popup.winfo_screenheight()
+    x = (screen_width - popup_width) // 2
+    y = (screen_height - popup_height) // 2
+    thinking_popup.geometry(f"+{x}+{y}")
+
+    thinking_popup.transient(window)
+
+    # '생각 중...' 팝업 창 닫기
+    thinking_popup.attributes('-topmost', True)
+
+    return thinking_popup
 
 # 사용자 입력을 처리하는 함수
 def handle_user_input():
     user_input = user_input_entry.get()
+    user_input_entry.delete(0, tk.END)
     
     # 사용자가 'quit'을 입력하면 GUI 종료
     if user_input.lower() == "quit":
         root.destroy()
         return
     
+    #생각중... 팝업 시작
+    popup_window = show_popup(root, "생각 중...")
+    
     # 사용자 입력을 대화 기록에 추가
     message_log.append({"role": "user", "content": user_input})
 
-    # '생각 중...' 메시지를 표시하기 위한 팝업 창 생성
-    thinking_popup = tk.Toplevel(root)
-    thinking_popup.title("생각 중...")
-
-    # '생각 중...' 메시지를 표시하는 레이블
-    thinking_label = tk.Label(thinking_popup, text="생각 중...", font=("Clear Gothic", 12))
-    thinking_label.pack(padx=20, pady=10)
-
-    # 팝업 창을 화면 중앙에 표시
-    thinking_popup.update_idletasks()
-    popup_width = thinking_popup.winfo_reqwidth()
-    popup_height = thinking_popup.winfo_reqheight()
-    screen_width = thinking_popup.winfo_screenwidth()
-    screen_height = thinking_popup.winfo_screenheight()
-    x = (screen_width - popup_width) // 2
-    y = (screen_height - popup_height) // 2
-    thinking_popup.geometry(f"+{x}+{y}")
-    
-    thinking_popup.update()
-
     # 대화 기록을 챗봇에 전송하고 응답을 받음
     response = send_message(message_log)
-
-    # '생각 중...' 팝업 창 닫기
-    thinking_popup.destroy()
+    
+    #생각중.. 팝업 끝
+    popup_window.destroy()
 
     # 챗봇 응답을 대화 기록에 추가하고 GUI에 표시
     message_log.append({"role": "assistant", "content": response})
     chat_history_text.config(state=tk.NORMAL)
+   
 
     # 사용자와 챗봇 메시지를 다르게 색상 지정
     chat_history_text.tag_configure("user_tag", background="lightblue")
@@ -109,6 +130,9 @@ def extract_csv_to_dataframe(response):
        
 # 플레이리스트를 CSV로 저장하는 함수
 def save_playlist_as_csv(playlist_df):
+    if playlist_df is None:
+        messagebox.showerror("오류", "플레이리스트 데이터 추출에 실패했습니다.")
+        return
     # 사용자에게 플레이리스트를 CSV로 저장할지 물음
     response = messagebox.askyesno("플레이리스트를 CSV로 저장", "이 플레이리스트를 CSV로 저장하시겠습니까?")
     if response:
@@ -117,7 +141,10 @@ def save_playlist_as_csv(playlist_df):
         if file_path:
             # DataFrame을 CSV로 저장
             playlist_df.to_csv(file_path, index=False, sep=";")
-            messagebox.showinfo("성공", "플레이리스트가 성공적으로 CSV로 저장되었습니다.")
+            messagebox.showinfo("성공", f"플레이리스트가 성공적으로 CSV로 저장되었습니다.\n저장 경로는 다음과 같습니다.\n{file_path}")
+    else:
+        messagebox.showinfo("취소", "저장을 취소했습니다.")
+        
 
 # 메인 GUI 창 생성
 root = tk.Tk()
@@ -133,17 +160,8 @@ user_input_entry.pack(pady=10)
 
 # 사용자 입력을 처리하는 "Send" 버튼 생성
 send_button = tk.Button(root, text="Send", command=handle_user_input, font=("Clear Gothic", 12))
-send_button.pack()
+send_button.pack(side=tk.RIGHT)
 
-# 대화 기록 초기화
-message_log = [{"role": "system", "content": '''
-                -You are a DJ assistant who creates playlists. Users are Korean, so they have to communicate in Korean, but artist names and song titles should not be translated into Korean.
-                -When showing a playlist, the title, artistry sheet, and release year of each song must be displayed in a list format. You should ask the user, 'Do you want to save this playlist as CSV?'
-                -To save, you must display the playlist with a header in CSV format separated by a semicolon (;) and a release year in 'YYYY' format.
-                -CSV format must start on a new line, and the header of the CSV file must be in English.
-                -Must be composed in the format ‘Title;Aritst;Release Date’
-                '''
-                }]
 
 # GUI 이벤트 루프 시작
 root.mainloop()
