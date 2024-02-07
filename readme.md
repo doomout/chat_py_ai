@@ -13,6 +13,10 @@ IDE : vscode
 챗 GPT API 키 발급 : https://platform.openai.com/api-keys  
 
 -개발 중 이슈 생길 때마다 업데이트-
+0. openai 라이브러리 설치
+```py
+pip install openai
+```
 1. API 키 환경 변수에 설정하여 숨기기(윈도우 10 파워쉘에서.)
 ```powershell
 $env:OPENAI_API_KEY='api_key넣기'
