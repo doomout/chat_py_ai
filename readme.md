@@ -53,3 +53,48 @@ pandas 3.0 버전부터는 더 나은 성능을 위해 Arrow 문자열 유형과
 ```py
 pip install pyarrow
 ```
+7. 0.28.1 에서 1.1.1 으로 변경시 수정 사항(이것 때문에 날샘 ㅡㅡ)
+```py
+import openai #0.28.1 버전
+from openai import OpenAI #1.1.1 버전
+-----------------------------------------------------------------------
+openai.api_key = os.getenv("OPENAI_API_KEY", default="") #0.28.1 버전 
+client = OpenAI(api_key=OPENAI_API_KEY) #1.1.1 버전
+------------------------------------------------------------------------
+def send_message(message_log):
+    response = openai.ChatCompletion.create( #0.28.1 버전 
+        model="gpt-3.5-turbo",
+        max_tokens=1000,
+        messages=message_log,
+        temperature=0.1
+    )
+    for choice in response.choices:
+        if "text" in choice:
+            return choice.text
+    return response.choices[0].message['content'] #0.28.1 버전
+
+def send_message(message_log):
+    response = client.chat.completions.create( #1.1.1 버전
+        model="gpt-3.5-turbo",
+        max_tokens=1000,
+        messages=message_log,
+        temperature=0.1
+    )
+    for choice in response.choices:
+        if "text" in choice:
+            return choice.text
+    return response.choices[0].message.content #1.1.1 버전
+```
+8. api_key를 config.py 파일에 입력하고 불러는 법(config.py가 최상위에 있다는 가정)  
+```py
+import os
+sys.path.append(os.path.dirname(os.path.abspath(__file__)) + '/../') #config 파일 경로
+from config import OPENAI_API_KEY #프로젝트 내에 config 파일에 api_key를 설정
+
+#프로젝트 내에 config 파일에 api_key를 설정 했을 때
+client = OpenAI(api_key=OPENAI_API_KEY)
+```
+```py
+#config.py내용
+OPENAI_API_KEY="your_openai_api_key"
+```
