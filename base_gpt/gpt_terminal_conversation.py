@@ -1,15 +1,17 @@
 import openai #OpenAI API를 사용
 import os
 import sys
+sys.stdout.reconfigure(encoding='utf-8')# UTF-8 인코딩 설정
+sys.path.append(os.path.dirname(os.path.abspath(__file__)) + '/../') #config 파일 경로
+from config import OPENAI_API_KEY #프로젝트 내에 config 파일에 api_key를 설정
+from openai import OpenAI # openai==1.1.1 설정
 
-# Set the encoding to UTF-8
-sys.stdout.reconfigure(encoding='utf-8')
-
-openai.api_key = os.getenv("OPENAI_API_KEY", default="") #API 키를 환경 변수에 저장하고 불러온다.
+#프로젝트 내에 config 파일에 api_key를 설정 했을 때
+client = OpenAI(api_key=OPENAI_API_KEY)
 
 #OpenAI 챗봇 모델에 메시즈를 보내고 응답하는 함수
 def send_message(message_log): 
-    response = openai.ChatCompletion.create(
+    response = client.chat.completions.create(
         model = "gpt-3.5-turbo",
         max_tokens=1000, #생성된 응답에서 최대 토큰 수 설정
         messages = message_log,
@@ -20,7 +22,7 @@ def send_message(message_log):
     for choice in response.choices:
         if "text" in choice:
             return choice.text
-    return response.choices[0].message['content'] 
+    return response.choices[0].message.content
     
 def main():
     #챗봇에서 받은 메시지로 대화 기록 초기화 하기

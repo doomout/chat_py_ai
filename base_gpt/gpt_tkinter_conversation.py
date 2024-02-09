@@ -7,12 +7,6 @@ sys.path.append(os.path.dirname(os.path.abspath(__file__)) + '/../') #config 파
 from config import OPENAI_API_KEY #프로젝트 내에 config 파일에 api_key를 설정
 from openai import OpenAI # openai==1.1.1 설정
 
-# OpenAI API 키 설정 0.28.1 버전
-'''
-import os
-openai.api_key = os.getenv("OPENAI_API_KEY", default="")
-'''
-
 #프로젝트 내에 config 파일에 api_key를 설정 했을 때
 client = OpenAI(api_key=OPENAI_API_KEY)
 

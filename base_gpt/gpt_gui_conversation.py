@@ -1,18 +1,19 @@
-import openai
+#import openai
 import os
 import tkinter as tk
 from tkinter import scrolledtext, messagebox
-
-# UTF-8 인코딩 설정
 import sys
-sys.stdout.reconfigure(encoding='utf-8')
+sys.stdout.reconfigure(encoding='utf-8')# UTF-8 인코딩 설정
+sys.path.append(os.path.dirname(os.path.abspath(__file__)) + '/../') #config 파일 경로
+from config import OPENAI_API_KEY #프로젝트 내에 config 파일에 api_key를 설정
+from openai import OpenAI # openai==1.1.1 설정
 
-# OpenAI API 키 설정
-openai.api_key = os.getenv("OPENAI_API_KEY", default="")
+#프로젝트 내에 config 파일에 api_key를 설정 했을 때
+client = OpenAI(api_key=OPENAI_API_KEY)
 
 # OpenAI 챗봇 모델과 상호 작용하는 함수
 def send_message(message_log):
-    response = openai.ChatCompletion.create(
+    response = client.chat.completions.create(
         model="gpt-3.5-turbo",
         max_tokens=1000,
         messages=message_log,
@@ -23,7 +24,7 @@ def send_message(message_log):
     for choice in response.choices:
         if "text" in choice:
             return choice.text
-    return response.choices[0].message['content']
+    return response.choices[0].message.content
 
 # GUI에서 사용자 입력을 처리하는 함수
 def handle_user_input():
