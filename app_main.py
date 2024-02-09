@@ -1,16 +1,22 @@
-import os
 import tkinter as tk
 from tkinter import scrolledtext, messagebox, filedialog
 import pandas as pd
-# UTF-8 인코딩 설정
 import sys
-sys.stdout.reconfigure(encoding='utf-8')
+sys.stdout.reconfigure(encoding='utf-8') # UTF-8 인코딩 설정
 
-# openai==1.1.1 설정
-from openai import OpenAI 
+from config import OPENAI_API_KEY #프로젝트 내에 config 파일에 api_key를 설정
+from openai import OpenAI # openai==1.1.1 설정
+
+#PC 환경 설정에 openai_api_Key를 설정 했을 때
+"""
+import os
 client = OpenAI(
     api_key=os.environ.get("OPENAI_API_KEY"),
 )
+"""
+
+#프로젝트 내에 config 파일에 api_key를 설정 했을 때
+client = OpenAI(api_key=OPENAI_API_KEY)
 
 # 플레이리스트를 CSV로 저장하는 함수
 def save_playlist_as_csv(playlist_df):
