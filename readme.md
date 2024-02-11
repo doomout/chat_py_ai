@@ -98,3 +98,5 @@ client = OpenAI(api_key=OPENAI_API_KEY)
 #config.py내용
 OPENAI_API_KEY="your_openai_api_key"
 ```
+9. GTP 펑션 콜 예제
+https://platform.openai.com/docs/guides/function-calling/function-calling
