@@ -19,30 +19,28 @@ client = OpenAI(
 client = OpenAI(api_key=OPENAI_API_KEY)
 
 # 플레이리스트를 CSV로 저장하는 함수
-def save_playlist_as_csv(playlist_df):
+def save_to_csv(playlist_df):
     file_path=filedialog.asksaveasfilename(defaultextension='.csv', filetypes=[("CSV files", "*.csv")])
     if file_path:
-        playlist_df.to_csv(file_path, sep=';', index=False, lineterminator='\n')
-        return f'파일을 저장했습니다. 저장 경로는 다음과 같습니다. \n {file_path}\n'
+        playlist_df.to_csv(file_path, sep=';', index=False)
+        return f'파일을 저장했습니다. 저장 경로는 다음과 같습니다. \n {file_path}'
     return '저장을 취소했습니다'
 
-# CSV 형식을 추출하여 pandas 데이터 프레임으로 변환하는 함수
-def extract_csv_to_dataframe(response):
+# function_call 사용한 함수
+def save_playlist_as_csv(playlist_csv):
     # 응답에 CSV 형식이 포함되어 있는지 확인
-    if ";" in response:
-        response_lines = response.strip().split("\n")
+    if ";" in playlist_csv:
+        lines = playlist_csv.strip().split("\n")
         csv_data=[]
-        for line in response_lines:
+        for line in lines:
             if ";" in line:
                 csv_data.append(line.split(";"))
             
         if len(csv_data) > 0:
             df=pd.DataFrame(csv_data[1:], columns=csv_data[0])
-            return df
-        else:
-            return None
-    else:
-        return None
+            return save_to_csv(df)
+        
+    return f'저장에 실패했습니다. \n저장에 실패한 내용은 다음과 같습니다. \n{playlist_csv}'
      
 # OpenAI 챗봇 모델과 상호 작용하는 함수
 def send_message(message_log):
@@ -132,8 +130,8 @@ def main():
         #생각중.. 팝업 끝
         popup_window.destroy()
 
-        # CSV 형식을 추출하여 pandas DataFrame으로 변환
-        playlist_df = extract_csv_to_dataframe(response)
+        # CSV 형식을 추출
+        playlist_df = save_playlist_as_csv(response)
 
         if playlist_df is not None:
             file_save_result = save_playlist_as_csv(playlist_df)
