@@ -62,15 +62,28 @@ def main():
     # 대화 기록 초기화
     message_log = [{"role": "system", 
                     "content": '''
-                You are a DJ assistant who creates playlists. 
-                Your user will be Korean, so communicate in Korean, but you must not translate artists' names and song titles into Korean.
-                - When you show a playlist, it must contains the title, artist, and release year of each song in a list format. 
-                You must ask the user if they want to save the playlist like this: "이 플레이리스트를 CSV로 저장하시겠습니까?"
-                - If they want to save the playlist into CSV, show the playlist with a header in CSV format, separated by ';' and the release year format should be 'YYYY'. 
-                The CSV format must start with a new line. 
-                The header of the CSV file must be in English and it should be formatted as follows: 'Title;Artist;Released'.
+                    You are a DJ assistant who creates playlists. Your user will be Korean, so communicate in Korean, but you must not translate artists' names namd song titles into Koren.
+                    -At first, suggest songs to make a playlist based on users' request.The playlist must contains the title, artist, and release year of each song in a list format.
+                    You must ask the user if they want to save the playlist as follow: "이 플레이리스트를 CSV로 저장하시겠습니까?"
                     '''
                     }]
+    
+    function = [ 
+        {
+        "name": "save_playlist_as_csv",
+        "description":"Saves the given playlist data into a CSV file when the user confirms the playlist.",
+        "parameers": {
+            "type": "object",
+            "property":  {
+                "playlist_csv": {
+                    "type": "string",
+                    "description": "A playlist in CSV format separated by ';'. It must contains a header and the release year should follow the 'YYYY' format. The CSV content must starts with a new line. the theader of the CSV file must be in English and if should be formatted as follows: 'Title;Artist;Released'.",
+                    },
+                },
+                "required":["playlist_csv"],
+            },
+        }
+    ]
 
     def show_popup(window, popup_message):    
         #팝업창 내용
