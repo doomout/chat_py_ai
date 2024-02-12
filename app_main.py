@@ -3,7 +3,7 @@ from tkinter import scrolledtext, messagebox, filedialog
 import pandas as pd
 import sys
 sys.stdout.reconfigure(encoding='utf-8') # UTF-8 인코딩 설정
-
+import json
 from config import OPENAI_API_KEY #프로젝트 내에 config 파일에 api_key를 설정
 from openai import OpenAI # openai==1.1.1 설정
 
@@ -22,7 +22,7 @@ client = OpenAI(api_key=OPENAI_API_KEY)
 def save_to_csv(playlist_df):
     file_path=filedialog.asksaveasfilename(defaultextension='.csv', filetypes=[("CSV files", "*.csv")])
     if file_path:
-        playlist_df.to_csv(file_path, sep=';', index=False)
+        playlist_df.to_csv(file_path, sep=';', index=False, lineterminator='\n')
         return f'파일을 저장했습니다. 저장 경로는 다음과 같습니다. \n {file_path}'
     return '저장을 취소했습니다'
 
@@ -43,18 +43,44 @@ def save_playlist_as_csv(playlist_csv):
     return f'저장에 실패했습니다. \n저장에 실패한 내용은 다음과 같습니다. \n{playlist_csv}'
      
 # OpenAI 챗봇 모델과 상호 작용하는 함수
-def send_message(message_log):
+def send_message(message_log, functions):
     response = client.chat.completions.create(
-        model="gpt-3.5-turbo",
+        model='gpt-3.5-turbo',
         max_tokens=1000,
         messages=message_log,
-        temperature=0.1
+        temperature=0.1,
+        functions=functions,
+        function_call='auto'
     )
+    response_message = response.choices[0].message
 
-    # 생성된 텍스트 중 첫 번째 텍스트 반환
-    for choice in response.choices:
-        if "text" in choice:
-            return choice.text
+    if response_message.get("function_call"):
+        available_function ={
+            "save_playlist_as_csv": save_playlist_as_csv, #함수는 여러개 설정 가능
+        }
+        function_name=response_message["function_call"]["name"]
+        function_to_call=available_function[function_name]
+        function_args=json.loads(response_message["function_call"]["arguments"])
+        #사용하는 함수에 따라 사용하는 인자의 개수와 내용이 달라질 수 있도록
+        # **function_args로 처리하기
+        function_response=function_to_call(**function_args)
+
+        #함수를 실행한 결과를 GPT에게 보내 답을 받아오기 위한 부분
+        message_log.append(response_message)#GPT 답변을 message_log에 추가
+        message_log.append(
+            {
+                "role": "function",
+                "name": "function_name",
+                "content": function_response,
+            }
+        ) #함수 실행 결과도 gpt messags에 추가
+
+        response=client.chat.completions.create(
+            model='gpt-3.5-turbo',
+            max_tokens=1000,
+            messages=message_log,
+            temperature=0.1,
+        )#함수 실행 결과를 gpt에 보내 새로운 답변 받아오기
     return response.choices[0].message.content
 
 
@@ -62,13 +88,13 @@ def main():
     # 대화 기록 초기화
     message_log = [{"role": "system", 
                     "content": '''
-                    You are a DJ assistant who creates playlists. Your user will be Korean, so communicate in Korean, but you must not translate artists' names namd song titles into Koren.
+                    You are a DJ assistant who creates playlists. Your user will be Korean, so communicate in Korean, but you must not translate artists' names and song titles into Koren.
                     -At first, suggest songs to make a playlist based on users' request.The playlist must contains the title, artist, and release year of each song in a list format.
                     You must ask the user if they want to save the playlist as follow: "이 플레이리스트를 CSV로 저장하시겠습니까?"
                     '''
                     }]
     
-    function = [ 
+    functions = [ 
         {
         "name": "save_playlist_as_csv",
         "description":"Saves the given playlist data into a CSV file when the user confirms the playlist.",
@@ -94,7 +120,7 @@ def main():
         thinking_label = tk.Label(thinking_popup, text=popup_message, font=("맑은 고딕", 12))
         thinking_label.pack(expand=True, fill=tk.BOTH)
 
-         # 팝업 창의 크기 조절하기
+        # 팝업 창의 크기 조절하기
         window.update_idletasks()
         popup_width=thinking_label.winfo_reqwidth() + 20
         popup_height=thinking_label.winfo_reqheight() + 20
@@ -138,22 +164,10 @@ def main():
         window.update_idletasks() 
 
         # 대화 기록을 챗봇에 전송하고 응답을 받음
-        response = send_message(message_log)
+        response = send_message(message_log, functions)
         
         #생각중.. 팝업 끝
         popup_window.destroy()
-
-        # CSV 형식을 추출
-        playlist_df = save_playlist_as_csv(response)
-
-        if playlist_df is not None:
-            file_save_result = save_playlist_as_csv(playlist_df)
-            print(file_save_result)
-            if file_save_result == '저장을 취소했습니다':
-                response = file_save_result
-            else:
-                response = file_save_result + '\n' + response
-
 
         # 챗봇 응답을 대화 기록에 추가하고 GUI에 표시
         message_log.append({"role": "assistant", "content": response})
