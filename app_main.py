@@ -19,10 +19,10 @@ client = OpenAI(
 client = OpenAI(api_key=OPENAI_API_KEY)
 
 # 플레이리스트를 CSV로 저장하는 함수
-def save_to_csv(playlist_df):
+def save_to_csv(df):
     file_path=filedialog.asksaveasfilename(defaultextension='.csv', filetypes=[("CSV files", "*.csv")])
     if file_path:
-        playlist_df.to_csv(file_path, sep=';', index=False, lineterminator='\n')
+        df.to_csv(file_path.name, sep=';', index=False, lineterminator='\n')
         return f'파일을 저장했습니다. 저장 경로는 다음과 같습니다. \n {file_path}'
     return '저장을 취소했습니다'
 
@@ -41,49 +41,47 @@ def save_playlist_as_csv(playlist_csv):
             return save_to_csv(df)
         
     return f'저장에 실패했습니다. \n저장에 실패한 내용은 다음과 같습니다. \n{playlist_csv}'
-     
-# OpenAI 챗봇 모델과 상호 작용하는 함수
-def send_message(message_log, functions):
+
+def send_message(message_log, functions, gpt_model="gpt-3.5-turbo", temperature=0.1):
     response = client.chat.completions.create(
-        model='gpt-3.5-turbo',
+        model=gpt_model,
         max_tokens=1000,
         messages=message_log,
-        temperature=0.1,
+        temperature=temperature,
         functions=functions,
         function_call='auto'
     )
     response_message = response.choices[0].message
 
-    if response_message.get("function_call"):
-        available_function ={
-            "save_playlist_as_csv": save_playlist_as_csv, #함수는 여러개 설정 가능
-        }
-        function_name=response_message["function_call"]["name"]
-        function_to_call=available_function[function_name]
-        function_args=json.loads(response_message["function_call"]["arguments"])
-        #사용하는 함수에 따라 사용하는 인자의 개수와 내용이 달라질 수 있도록
-        # **function_args로 처리하기
-        function_response=function_to_call(**function_args)
+    if response_message.function_call:
+        function_name = response_message.function_call.name
+        if function_name == 'save_playlist_as_csv':
+            function_args = json.loads(response_message.function_call.arguments)
+            if "playlist_csv" in function_args:  # 인자가 올바르게 전달되었는지 확인
+                function_response = save_playlist_as_csv(function_args["playlist_csv"])
+                message_log.append({
+                    "role": "function",
+                    "name": function_name,
+                    "content": function_response,
+                })
+                # 함수 실행 후 새로운 응답을 받아옴
+                response = client.chat.completions.create(
+                    model=gpt_model,
+                    messages=message_log,
+                    max_tokens=1000,
+                    temperature=temperature,
+                )
+                response_message = response.choices[0].message
+            else:
+                function_response = "함수 호출에 필요한 'playlist_csv' 인자가 없습니다."
+                message_log.append({
+                    "role": "function",
+                    "name": function_name,
+                    "content": function_response,
+                })
+                response_message.content = function_response
 
-        #함수를 실행한 결과를 GPT에게 보내 답을 받아오기 위한 부분
-        message_log.append(response_message)#GPT 답변을 message_log에 추가
-        message_log.append(
-            {
-                "role": "function",
-                "name": "function_name",
-                "content": function_response,
-            }
-        ) #함수 실행 결과도 gpt messags에 추가
-
-        response=client.chat.completions.create(
-            model='gpt-3.5-turbo',
-            max_tokens=1000,
-            messages=message_log,
-            temperature=0.1,
-        )#함수 실행 결과를 gpt에 보내 새로운 답변 받아오기
-    return response.choices[0].message.content
-
-
+    return response_message.content
 def main():
     # 대화 기록 초기화
     message_log = [{"role": "system", 
@@ -114,7 +112,7 @@ def main():
     def show_popup(window, popup_message):    
         #팝업창 내용
         thinking_popup = tk.Toplevel(window)
-        thinking_popup.title("")
+        thinking_popup.title("GPT-3.5")
 
         # '생각 중...' 메시지를 표시하는 레이블
         thinking_label = tk.Label(thinking_popup, text=popup_message, font=("맑은 고딕", 12))
@@ -174,9 +172,10 @@ def main():
 
         # 사용자 입력과 챗봇 응답에 태그 적용
         chat_history_text.insert(tk.END, f"assistant: {response}\n", "assistant_tag")
+
+        # chat_history_text를 수정하지 못하게 설정
         chat_history_text.config(state=tk.DISABLED)
         
-        # chat_history_text를 수정하지 못하게 설정
         chat_history_text.see(tk.END)
 
 
